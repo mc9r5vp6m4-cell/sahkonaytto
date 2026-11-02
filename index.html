@@ -112,10 +112,6 @@ body{
     box-shadow:0 0 8px rgba(0,0,0,.4);
 }
 
-.next-bar{
-    outline:4px solid white;
-    outline-offset:-2px;
-}
 
 .stats{
     margin-top:12px;
@@ -200,8 +196,8 @@ function getLevel(price){
     if(price <= 5){
         return {
             color:"#0f9d58",
-            status:"VAPAA KULUTUS",
-            message:"Tee mitä haluat"
+            status:"VAPAA SÄHKÖNKULUTUS",
+            message:"Tee mitä haluat ja enemmänkin"
         };
     }
 
@@ -209,7 +205,7 @@ function getLevel(price){
         return {
             color:"#43a047",
             status:"NORMAALI KÄYTTÖ",
-            message:"Normaali käyttö"
+            message:"Kuluta sähköä normaalisti"
         };
     }
 
@@ -225,7 +221,7 @@ function getLevel(price){
         return {
             color:"#ef6c00",
             status:"KALLISTA SÄHKÖÄ",
-            message:"Vältä pitkiä suihkuja ja pesukoneita"
+            message:"Vältä pitkiä kuumia suihkuja ja pesukoneita"
         };
     }
 
@@ -259,9 +255,7 @@ function drawChart(hours){
     const currentHour =
         new Date().getHours();
 
-    const nextHour =
-        (currentHour + 1) % 24;
-
+   
     hours.forEach(h => {
 
         const bar =
@@ -269,10 +263,7 @@ function drawChart(hours){
 
         bar.className = "bar";
 
-        if(h.hour === nextHour){
-            bar.classList.add("next-bar");
-        }
-
+        
         let height =
             (h.price / max) * 100;
 
