@@ -1,33 +1,331 @@
 <!DOCTYPE html>
 <html lang="fi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pörssisähkön seuranta</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-            margin: 0;
-            display: flex;
-            height: 100vh;
-            justify-content: center;
-            align-items: center;
-            background: #2e7d32;
-            color: white;
-            text-align: center;
-        }
-        h1 {
-            font-size: 4rem;
-        }
-        p {
-            font-size: 2rem;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pörssisähkö</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+}
+
+body{
+    height:100vh;
+    color:white;
+    transition:background-color .4s;
+    overflow:hidden;
+}
+
+.container{
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    text-align:center;
+    padding:20px;
+}
+
+.price{
+    font-size:clamp(5rem,15vw,12rem);
+    font-weight:900;
+    line-height:1;
+}
+
+.unit{
+    font-size:2rem;
+    opacity:.9;
+}
+
+.status{
+    font-size:3rem;
+    font-weight:700;
+    margin-top:10px;
+}
+
+.message{
+    font-size:1.8rem;
+    margin-top:10px;
+}
+
+.top-right{
+    position:absolute;
+    top:20px;
+    right:25px;
+    text-align:right;
+}
+
+.clock{
+    font-size:1.1rem;
+}
+
+.next-price{
+    margin-top:8px;
+    font-size:1.6rem;
+    font-weight:bold;
+}
+
+.arrow{
+    font-size:3rem;
+}
+
+.bottom{
+    position:absolute;
+    bottom:20px;
+    width:100%;
+    padding:0 30px;
+}
+
+.chart{
+    display:flex;
+    align-items:flex-end;
+    gap:3px;
+    height:140px;
+}
+
+.bar{
+    flex:1;
+    border-radius:4px 4px 0 0;
+}
+
+.stats{
+    margin-top:12px;
+    display:flex;
+    justify-content:space-between;
+    font-size:1rem;
+}
+
+.small{
+    opacity:0.9;
+}
+</style>
 </head>
+
 <body>
-    <div>
-        <h1>Pörssisähkön infonäyttö</h1>
-        <p>Sivu toimii – lopullinen versio tulossa.</p>
+
+<div class="top-right">
+    <div class="clock" id="clock"></div>
+    <div class="next-price">
+        Seuraava tunti: <span id="nextHour">--</span>
     </div>
+    <div class="arrow" id="arrow">➡️</div>
+</div>
+
+<div class="container">
+    <div class="price" id="price">--</div>
+    <div class="unit">snt/kWh</div>
+
+    <div class="status" id="status">Ladataan...</div>
+    <div class="message" id="message"></div>
+</div>
+
+<div class="bottom">
+    <div class="chart" id="chart"></div>
+
+    <div class="stats">
+        <div id="cheapest" class="small"></div>
+        <div id="expensive" class="small"></div>
+    </div>
+</div>
+
+<script>
+
+function updateClock(){
+    document.getElementById("clock").innerText =
+        new Date().toLocaleString("fi-FI");
+}
+setInterval(updateClock,1000);
+updateClock();
+
+function getLevel(price){
+
+    if(price <= 5){
+        return {
+            color:"#0f9d58",
+            status:"VAPAA KULUTUS",
+            message:"Tee mitä haluat"
+        };
+    }
+
+    if(price <= 10){
+        return {
+            color:"#43a047",
+            status:"NORMAALI KÄYTTÖ",
+            message:"Normaali käyttö"
+        };
+    }
+
+    if(price <= 20){
+        return {
+            color:"#fbc02d",
+            status:"HARKITTU KÄYTTÖ",
+            message:"Siirrä kodinkonehommat, jos mahdollista"
+        };
+    }
+
+    if(price <= 30){
+        return {
+            color:"#ef6c00",
+            status:"KALLISTA SÄHKÖÄ",
+            message:"Vältä pitkiä suihkuja ja pesukoneita"
+        };
+    }
+
+    return {
+        color:"#c62828",
+        status:"SÄÄSTÖTILA",
+        message:"Käytä vain välttämättömiä"
+    };
+}
+
+function barColor(price){
+
+    if(price <= 5) return "#00e676";
+    if(price <= 10) return "#66bb6a";
+    if(price <= 20) return "#ffee58";
+    if(price <= 30) return "#ff9800";
+
+    return "#ef5350";
+}
+
+function drawChart(hours){
+
+    const chart=document.getElementById("chart");
+    chart.innerHTML="";
+
+    const max=Math.max(...hours.map(h=>h.price),5);
+
+    hours.forEach(h=>{
+
+        const bar=document.createElement("div");
+        bar.className="bar";
+
+        let height=(h.price/max)*100;
+        height=Math.max(height,5);
+
+        bar.style.height=height+"%";
+        bar.style.background=barColor(h.price);
+
+        bar.title=
+            `${h.hour}:00 - ${h.price.toFixed(1)} snt/kWh`;
+
+        chart.appendChild(bar);
+    });
+}
+
+async function loadData(){
+
+    try{
+
+        const todayResp =
+            await fetch("https://sahkonhintahuomenna.fi/api/v1/fi/today.json");
+
+        const todayData =
+            await todayResp.json();
+
+        const prices =
+            todayData.prices;
+
+        const now = new Date();
+
+        const currentHour =
+            now.getHours();
+
+        const hourly=[];
+
+        for(let h=0; h<24; h++){
+
+            const hourRows = prices.filter(p => {
+                const d = new Date(p.start);
+                return d.getHours() === h;
+            });
+
+            if(hourRows.length){
+
+                const avg =
+                    hourRows.reduce(
+                        (a,b)=>a+b.cents_per_kWh_incl_vat,0
+                    ) / hourRows.length;
+
+                hourly.push({
+                    hour:h,
+                    price:avg
+                });
+            }
+        }
+
+        const current =
+            hourly.find(x=>x.hour===currentHour);
+
+        if(!current) return;
+
+        const next =
+            hourly.find(x=>x.hour===((currentHour+1)%24));
+
+        const level =
+            getLevel(current.price);
+
+        document.body.style.backgroundColor =
+            level.color;
+
+        document.getElementById("price").innerText =
+            current.price.toFixed(1);
+
+        document.getElementById("status").innerText =
+            level.status;
+
+        document.getElementById("message").innerText =
+            level.message;
+
+        if(next){
+
+            document.getElementById("nextHour").innerText =
+                next.price.toFixed(1)+" snt";
+
+            const diff =
+                next.price-current.price;
+
+            let arrow="➡️";
+
+            if(diff > 0.5) arrow="⬆️";
+            if(diff < -0.5) arrow="⬇️";
+
+            document.getElementById("arrow").innerText =
+                arrow;
+        }
+
+        const cheapest =
+            [...hourly].sort((a,b)=>a.price-b.price)[0];
+
+        const expensive =
+            [...hourly].sort((a,b)=>b.price-a.price)[0];
+
+        document.getElementById("cheapest").innerText =
+            `Halvin: klo ${cheapest.hour}:00 (${cheapest.price.toFixed(1)} snt)`;
+
+        document.getElementById("expensive").innerText =
+            `Kallein: klo ${expensive.hour}:00 (${expensive.price.toFixed(1)} snt)`;
+
+        drawChart(hourly);
+
+    }
+    catch(err){
+
+        console.error(err);
+
+        document.getElementById("status").innerText =
+            "Hintadatan lataus epäonnistui";
+    }
+}
+
+loadData();
+setInterval(loadData,300000);
+
+</script>
+
 </body>
 </html>
