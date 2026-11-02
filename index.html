@@ -71,6 +71,13 @@ body{
 
 .arrow{
     font-size:3rem;
+    font-weight:bold;
+}
+
+#trendText{
+    font-weight:bold;
+    font-size:1rem;
+    margin-top:5px;
 }
 
 .bottom{
@@ -90,6 +97,24 @@ body{
 .bar{
     flex:1;
     border-radius:4px 4px 0 0;
+    position:relative;
+}
+
+.current-marker{
+    position:absolute;
+    width:30px;
+    height:30px;
+    top:-36px;
+    left:50%;
+    transform:translateX(-50%);
+    z-index:20;
+    border-radius:4px;
+    box-shadow:0 0 8px rgba(0,0,0,.4);
+}
+
+.next-bar{
+    outline:4px solid white;
+    outline-offset:-2px;
 }
 
 .stats{
@@ -100,7 +125,15 @@ body{
 }
 
 .small{
-    opacity:0.9;
+    opacity:.95;
+}
+
+.cheapest{
+    color:#9cff9c;
+}
+
+.expensive{
+    color:#ffd6d6;
 }
 </style>
 </head>
@@ -109,27 +142,47 @@ body{
 
 <div class="top-right">
     <div class="clock" id="clock"></div>
+
     <div class="next-price">
-        Seuraava tunti: <span id="nextHour">--</span>
+        Seuraava tunti:
+        <span id="nextHour">--</span>
     </div>
+
     <div class="arrow" id="arrow">➡️</div>
+
+    <div id="trendText"></div>
 </div>
 
 <div class="container">
+
     <div class="price" id="price">--</div>
+
     <div class="unit">snt/kWh</div>
 
-    <div class="status" id="status">Ladataan...</div>
+    <div class="status" id="status">
+        Ladataan...
+    </div>
+
     <div class="message" id="message"></div>
+
 </div>
 
 <div class="bottom">
+
     <div class="chart" id="chart"></div>
 
     <div class="stats">
-        <div id="cheapest" class="small"></div>
-        <div id="expensive" class="small"></div>
+
+        <div id="cheapest"
+             class="small cheapest">
+        </div>
+
+        <div id="expensive"
+             class="small expensive">
+        </div>
+
     </div>
+
 </div>
 
 <script>
@@ -138,6 +191,7 @@ function updateClock(){
     document.getElementById("clock").innerText =
         new Date().toLocaleString("fi-FI");
 }
+
 setInterval(updateClock,1000);
 updateClock();
 
@@ -194,24 +248,62 @@ function barColor(price){
 
 function drawChart(hours){
 
-    const chart=document.getElementById("chart");
+    const chart =
+        document.getElementById("chart");
+
     chart.innerHTML="";
 
-    const max=Math.max(...hours.map(h=>h.price),5);
+    const max =
+        Math.max(...hours.map(h => h.price),5);
 
-    hours.forEach(h=>{
+    const currentHour =
+        new Date().getHours();
 
-        const bar=document.createElement("div");
-        bar.className="bar";
+    const nextHour =
+        (currentHour + 1) % 24;
 
-        let height=(h.price/max)*100;
-        height=Math.max(height,5);
+    hours.forEach(h => {
 
-        bar.style.height=height+"%";
-        bar.style.background=barColor(h.price);
+        const bar =
+            document.createElement("div");
 
-        bar.title=
+        bar.className = "bar";
+
+        if(h.hour === nextHour){
+            bar.classList.add("next-bar");
+        }
+
+        let height =
+            (h.price / max) * 100;
+
+        height =
+            Math.max(height,5);
+
+        bar.style.height =
+            height + "%";
+
+        bar.style.background =
+            barColor(h.price);
+
+        bar.title =
             `${h.hour}:00 - ${h.price.toFixed(1)} snt/kWh`;
+
+        if(h.hour === currentHour){
+
+            const marker =
+                document.createElement("img");
+
+            marker.src =
+                "creeper.jpg";
+
+            marker.className =
+                "current-marker";
+
+            marker.alt =
+                "Nykyinen tunti";
+
+            bar.appendChild(marker);
+        }
 
         chart.appendChild(bar);
     });
@@ -222,7 +314,9 @@ async function loadData(){
     try{
 
         const todayResp =
-            await fetch("https://sahkonhintahuomenna.fi/api/v1/fi/today.json");
+            await fetch(
+                "https://sahkonhintahuomenna.fi/api/v1/fi/today.json"
+            );
 
         const todayData =
             await todayResp.json();
@@ -230,25 +324,29 @@ async function loadData(){
         const prices =
             todayData.prices;
 
-        const now = new Date();
-
         const currentHour =
-            now.getHours();
+            new Date().getHours();
 
         const hourly=[];
 
         for(let h=0; h<24; h++){
 
-            const hourRows = prices.filter(p => {
-                const d = new Date(p.start);
-                return d.getHours() === h;
-            });
+            const hourRows =
+                prices.filter(p => {
+
+                    const d =
+                        new Date(p.start);
+
+                    return d.getHours() === h;
+                });
 
             if(hourRows.length){
 
                 const avg =
                     hourRows.reduce(
-                        (a,b)=>a+b.cents_per_kWh_incl_vat,0
+                        (a,b)=>
+                         a+b.cents_per_kWh_incl_vat,
+                         0
                     ) / hourRows.length;
 
                 hourly.push({
@@ -259,12 +357,17 @@ async function loadData(){
         }
 
         const current =
-            hourly.find(x=>x.hour===currentHour);
+            hourly.find(
+                x => x.hour === currentHour
+            );
 
         if(!current) return;
 
         const next =
-            hourly.find(x=>x.hour===((currentHour+1)%24));
+            hourly.find(
+                x => x.hour ===
+                ((currentHour+1)%24)
+            );
 
         const level =
             getLevel(current.price);
@@ -272,42 +375,80 @@ async function loadData(){
         document.body.style.backgroundColor =
             level.color;
 
-        document.getElementById("price").innerText =
+        document.getElementById("price")
+            .innerText =
             current.price.toFixed(1);
 
-        document.getElementById("status").innerText =
+        document.getElementById("status")
+            .innerText =
             level.status;
 
-        document.getElementById("message").innerText =
+        document.getElementById("message")
+            .innerText =
             level.message;
 
         if(next){
 
-            document.getElementById("nextHour").innerText =
+            document.getElementById("nextHour")
+                .innerText =
                 next.price.toFixed(1)+" snt";
 
             const diff =
                 next.price-current.price;
 
             let arrow="➡️";
+            let text="ENNALLAAN";
+            let color="white";
 
-            if(diff > 0.5) arrow="⬆️";
-            if(diff < -0.5) arrow="⬇️";
+            if(diff > 0.5){
+                arrow="⬆️";
+                text=`KALLISTUU +${diff.toFixed(1)} snt`;
+                color="#ff5555";
+            }
 
-            document.getElementById("arrow").innerText =
+            if(diff < -0.5){
+                arrow="⬇️";
+                text=`HALPENEE ${diff.toFixed(1)} snt`;
+                color="#00ff66";
+            }
+
+            const arrowEl =
+                document.getElementById("arrow");
+
+            arrowEl.innerText =
                 arrow;
+
+            arrowEl.style.color =
+                color;
+
+            const trendEl =
+                document.getElementById("trendText");
+
+            trendEl.innerText =
+                text;
+
+            trendEl.style.color =
+                color;
         }
 
         const cheapest =
-            [...hourly].sort((a,b)=>a.price-b.price)[0];
+            [...hourly]
+            .sort((a,b)=>
+                a.price-b.price
+            )[0];
 
         const expensive =
-            [...hourly].sort((a,b)=>b.price-a.price)[0];
+            [...hourly]
+            .sort((a,b)=>
+                b.price-a.price
+            )[0];
 
-        document.getElementById("cheapest").innerText =
+        document.getElementById("cheapest")
+            .innerText =
             `Halvin: klo ${cheapest.hour}:00 (${cheapest.price.toFixed(1)} snt)`;
 
-        document.getElementById("expensive").innerText =
+        document.getElementById("expensive")
+            .innerText =
             `Kallein: klo ${expensive.hour}:00 (${expensive.price.toFixed(1)} snt)`;
 
         drawChart(hourly);
@@ -317,7 +458,8 @@ async function loadData(){
 
         console.error(err);
 
-        document.getElementById("status").innerText =
+        document.getElementById("status")
+            .innerText =
             "Hintadatan lataus epäonnistui";
     }
 }
